@@ -64,7 +64,7 @@ Crie um arquivo `.env` na raiz do projeto, baseado no `.env.example`. As seguint
 -   `EVOLUTION_API_KEY`: Sua chave de API para a Evolution API.
 -   `EVOLUTION_INSTANCE_NAME`: O nome da sua instância configurada na Evolution API.
 
-**Exemplo de `.env`:**
+**Exemplo de `.env**:**
 ```env
 PYTHONUNBUFFERED=1
 
@@ -180,14 +180,47 @@ Este é o endpoint que a Evolution API chamará quando uma nova mensagem do What
 
 ## Configurando o Webhook na Evolution API
 
-Para que este sistema funcione, você precisa configurar sua instância da Evolution API para enviar eventos de mensagem para o endpoint `/webhook/evolution` da sua aplicação.
+Para que este sistema funcione, você precisa configurar sua instância da Evolution API para enviar eventos de mensagem (webhooks) para o endpoint `/webhook/evolution` da sua aplicação FastAPI. A URL correta dependerá de como sua aplicação e a Evolution API estão hospedadas e conectadas em rede.
 
 1.  **Acesse as configurações da sua instância na Evolution API.**
-2.  **Encontre a seção de configuração de Webhooks Globais ou Webhooks de Mensagens.**
-3.  **Configure a URL do Webhook:**
-    *   Se sua aplicação FastAPI está rodando localmente e exposta via ngrok (ou similar) para testes, use a URL do ngrok: `https://seu-subdominio.ngrok.io/webhook/evolution`.
-    *   Se a Evolution API e sua aplicação estão rodando em containers Docker na mesma máquina e rede, e sua aplicação está exposta na porta 8000 do host, a Evolution API pode precisar de uma URL acessível *do ponto de vista dela*. Se ela também estiver em Docker, pode ser o IP do host Docker e a porta mapeada, ou o nome do serviço da sua app se estiverem na mesma rede Docker Compose e a Evolution API conseguir resolver. Ex: `http://host.docker.internal:8000/webhook/evolution` (para Docker Desktop) ou o IP da sua máquina na rede local.
-    *   **Importante:** Garanta que a Evolution API consiga alcançar a URL da sua aplicação.
+2.  **Localize a seção de configuração de Webhooks Globais ou Webhooks de Mensagens.**
+3.  **Defina a URL do Webhook com base nos seguintes cenários:**
+
+    *   **Cenário A: Sua aplicação FastAPI e a Evolution API estão rodando em containers Docker na mesma máquina e na mesma rede `docker-compose`.**
+        *   Neste caso, a Evolution API pode alcançar sua aplicação usando o nome do serviço definido no `docker-compose.yaml` para sua aplicação e a porta interna do container (que geralmente é a mesma que você expõe, mas aqui é a porta *dentro* da rede Docker).
+        *   **URL Exemplo:** `http://app:8000/webhook/evolution`
+            *   Assumindo que o serviço da sua aplicação no `docker-compose.yaml` se chama `app` e está ouvindo na porta `8000` internamente.
+
+    *   **Cenário B: Sua aplicação FastAPI está rodando localmente (Docker ou não) e precisa ser acessada pela Evolution API através da internet (ex: Evolution API na nuvem ou você está testando com um número de WhatsApp externo).**
+        *   **Opção 1: Usar `ngrok` ou um serviço similar de tunelamento.**
+            *   Estes serviços criam um túnel seguro da sua máquina local para um subdomínio público.
+            *   **URL Exemplo (ngrok):** `https://seu-subdominio-unico.ngrok.io/webhook/evolution`
+            *   Ideal para desenvolvimento e testes rápidos.
+        *   **Opção 2: Usar seu IP público e configurar o encaminhamento de porta (Port Forwarding) no seu roteador.**
+            *   Você precisaria de um IP público estático ou um serviço de DNS dinâmico (DDNS).
+            *   Configure seu roteador para encaminhar o tráfego de uma porta externa (ex: 80) para a porta da sua aplicação na sua máquina local (ex: 8000).
+            *   **URL Exemplo:** `http://seu-ip-publico:porta-externa/webhook/evolution`
+            *   Requer mais configuração de rede e considerações de segurança.
+
+    *   **Cenário C: Sua aplicação FastAPI está rodando localmente (Docker ou não) e a Evolution API está na mesma rede local (LAN/WLAN) que sua máquina.**
+        *   Neste caso, a Evolution API pode acessar sua aplicação usando o endereço IP da sua máquina na rede local e a porta em que sua aplicação está exposta.
+        *   **URL Exemplo:** `http://<ip-da-maquina-na-lan>:8000/webhook/evolution`
+            *   Substitua `<ip-da-maquina-na-lan>` pelo endereço IP da sua máquina na rede local (ex: `192.168.1.105`). Você pode encontrar esse IP com comandos como `ipconfig` (Windows) ou `ifconfig`/`ip addr` (Linux/macOS).
+            *   A porta `8000` deve ser a porta que sua aplicação (ou o Docker) está mapeando para o host.
+
+    *   **Cenário D: Sua aplicação FastAPI está rodando em Docker Desktop (Windows ou Mac) e a Evolution API (se também em Docker no mesmo host ou precisando acessar o host) precisa se conectar.**
+        *   Docker Desktop fornece um nome DNS especial, `host.docker.internal`, que resolve para o endereço IP interno da máquina host a partir de dentro de um container.
+        *   **URL Exemplo:** `http://host.docker.internal:8000/webhook/evolution`
+            *   Útil se a Evolution API (mesmo que em outro container no mesmo host) precisa alcançar a porta exposta pela sua aplicação no host.
+
+    *   **Cenário E: Sua aplicação FastAPI e a Evolution API estão rodando em servidores diferentes (ex: em produção na nuvem).**
+        *   Sua aplicação FastAPI terá um endereço IP público ou um nome DNS (ex: `api.seusite.com`).
+        *   **URL Exemplo:** `https://api.seusite.com/webhook/evolution` (usando HTTPS em produção é altamente recomendado).
+
+4.  **Verificações Importantes Após Configurar a URL:**
+    *   **Acessibilidade:** Certifique-se de que a Evolution API pode de fato alcançar a URL configurada. Considere firewalls (na sua máquina, no seu roteador, ou no provedor de nuvem) e configurações de rede.
+    *   **Logs:** Verifique os logs tanto da sua aplicação FastAPI quanto da Evolution API para quaisquer erros de conexão ou mensagens de webhook.
+    *   **Teste:** Envie uma mensagem para o número de WhatsApp conectado à sua instância da Evolution API para ver se o webhook é disparado e se sua aplicação o recebe.
 
 ## Como Adicionar Novas Ferramentas (Tools) ao Agente
 
@@ -251,5 +284,3 @@ O agente PydanticAI pode ser estendido com novas ferramentas para interagir com 
     *   **Causa:** A URL configurada na Evolution API está incorreta, sua aplicação não está acessível externamente (se a Evolution API for externa), ou há um problema de rede/firewall.
     *   **Solução:** Verifique a URL do webhook nas configurações da Evolution API. Use ferramentas como `ngrok` para expor sua aplicação localmente para testes. Verifique os logs da sua aplicação e da Evolution API.
 
----
-Dúvidas? Abra uma issue ou consulte a documentação interna do projeto.
