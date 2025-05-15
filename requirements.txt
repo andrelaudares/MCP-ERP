@@ -1,6 +1,0 @@
-fastmcp
-httpx
-pydantic
-pydantic-settings
-python-dotenv
-rich>=13.9.4,<14.0.0
