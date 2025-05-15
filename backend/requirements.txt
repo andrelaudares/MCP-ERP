@@ -1,0 +1,13 @@
+fastmcp
+httpx
+pydantic
+pydantic-settings
+python-dotenv
+google-generativeai
+rich>=13.9.4,<14.0.0
+fastapi
+uvicorn[standard]
+pydantic-ai==0.2.4
+
+# Se você precisar de psycopg2 para Postgres, descomente uma das seguintes linhas:
+# psycopg2-binary # Para a maioria dos casos
