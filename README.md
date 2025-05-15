@@ -34,6 +34,30 @@ Este projeto implementa um backend conversacional inteligente para integração 
    ```
 3. O serviço FastAPI estará disponível em `http://localhost:8000`.
 
+## Subindo o ambiente Docker (comandos úteis)
+
+Para garantir que todas as dependências estejam atualizadas e o ambiente limpo, utilize os seguintes comandos:
+
+```bash
+# Parar e remover todos os containers, se necessário
+docker compose down
+
+# (Re)construir a imagem do serviço principal (app)
+docker compose build app
+
+# Subir todos os serviços em segundo plano
+docker compose up -d
+
+# Ver logs do serviço principal (app)
+docker compose logs -f app
+```
+
+- O comando `docker compose up --build` também pode ser usado para buildar e subir tudo de uma vez.
+- Para acessar o container do app para depuração:
+```bash
+docker compose exec app /bin/bash
+```
+
 ## Endpoint principal
 
 ### POST `/webhook`
