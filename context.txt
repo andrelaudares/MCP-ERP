@@ -1,0 +1,120 @@
+7.2. Principais Endpoints e Métodos
+7.2.1. API de Clientes
+
+Endpoint: https://app.omie.com.br/api/v1/geral/clientes/
+Métodos Principais:
+
+ListarClientes: Obtém lista de clientes com filtros (TAG "Cliente")
+ConsultarCliente: Obtém detalhes de um cliente específico
+IncluirCliente: Cria um novo cliente (não utilizado neste projeto)
+AlterarCliente: Atualiza dados de um cliente (não utilizado neste projeto)
+
+
+
+7.2.2. API de Produtos
+
+Endpoint: https://app.omie.com.br/api/v1/geral/produtos/
+Métodos Principais:
+
+ListarProdutos: Obtém lista de produtos com filtros
+ConsultarProduto: Obtém detalhes de um produto específico
+ListarTabelasPreco: Obtém tabelas de preço disponíveis
+ConsultarProdutoTabelaPreco: Obtém preço específico de um produto em uma tabela
+
+
+
+7.2.3. API de Pedidos de Venda
+
+Endpoint: https://app.omie.com.br/api/v1/produtos/pedido/
+Métodos Principais:
+
+ListarPedidos: Obtém lista de pedidos com filtros
+ConsultarPedido: Obtém detalhes de um pedido específico
+IncluirPedido: Cria um novo pedido
+AlterarPedido: Atualiza um pedido existente
+TrocarEtapaPedido: Altera a etapa/status de um pedido
+
+
+
+7.2.4. API de Contas a Receber
+
+Endpoint: https://app.omie.com.br/api/v1/financas/contareceber/
+Métodos Principais:
+
+ListarContasReceber: Para verificação de limites de crédito e status financeiro do cliente
+
+
+
+7.3. Exemplo de Fluxo de Integração
+7.3.1. Consulta de Clientes
+json{
+  "call": "ListarClientes",
+  "app_key": "XXXXXXX",
+  "app_secret": "XXXXXXX",
+  "param": [
+    {
+      "pagina": 1,
+      "registros_por_pagina": 50,
+      "apenas_importado_api": "N",
+      "clientesFiltro": {
+        "tag": "Cliente"
+      }
+    }
+  ]
+}
+7.3.2. Consulta de Histórico de Pedidos
+json{
+  "call": "ListarPedidos",
+  "app_key": "XXXXXXX",
+  "app_secret": "XXXXXXX",
+  "param": [
+    {
+      "pagina": 1,
+      "registros_por_pagina": 50,
+      "apenas_importado_api": "N",
+      "filtrar_por_data_de": "01/01/2025",
+      "filtrar_por_data_ate": "14/05/2025",
+      "filtrar_por_cliente": {
+        "codigo_cliente_omie": "CÓDIGO_DO_CLIENTE"
+      }
+    }
+  ]
+}
+7.3.3. Criação de Pedido
+json{
+  "call": "IncluirPedido",
+  "app_key": "XXXXXXX",
+  "app_secret": "XXXXXXX",
+  "param": [
+    {
+      "cabecalho": {
+        "codigo_cliente": "CÓDIGO_DO_CLIENTE",
+        "data_previsao": "14/05/2025",
+        "etapa": "20", // Código da etapa (Pendente, Aprovado, etc.)
+        "codigo_parcela": "CÓDIGO_PARCELA", // Referente ao parcelamento
+        "qtde_parcelas": 1,
+        "codigo_cenario_impostos": "CÓDIGO_CENÁRIO"
+      },
+      "det": [
+        {
+          "produto": {
+            "codigo_produto": "CÓDIGO_PRODUTO",
+            "quantidade": 1,
+            "valor_unitario": 100.00
+          }
+        }
+        // Mais produtos conforme necessário
+      ]
+    }
+  ]
+}
+7.4. Requisitos de Integração Específicos
+7.4.1. Consultas ao Omie
+
+Listagem de clientes ativos com TAG "Cliente" (ListarClientes)
+Histórico de pedidos por cliente (ListarPedidos)
+Dados de produtos com preços (ListarProdutos, ConsultarProdutoTabelaPreco)
+Tabelas de preço associadas ao cliente (ListarTabelasPreco)
+Opções de parcelamento associadas ao cliente (ConsultarCliente)
+Status de faturamento de pedidos (ConsultarPedido, ListarPedidos)
+Limites de crédito de clientes (ListarContasReceber)

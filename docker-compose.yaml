@@ -1,0 +1,216 @@
+services:
+  db:
+    image: postgres:16
+    container_name: mcp_erp_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-myuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mypassword}
+      POSTGRES_DB: ${POSTGRES_DB:-mydatabase}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_adk_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7
+    container_name: mcp_erp_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+  rabbitmq:
+    image: rabbitmq:management
+    container_name: mcp_erp_rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-user}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-password}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  minio:
+    image: quay.io/minio/minio
+    container_name: mcp_erp_minio
+    restart: always
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_password}
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  evolution_postgres:
+    image: postgres:15
+    container_name: mcp_erp_evolution_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${EVOLUTION_DB_NAME:-evolution_db}
+      POSTGRES_USER: ${EVOLUTION_DB_USER:-evolution_user}
+      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD:-evolution_password}
+    volumes:
+      - postgres_evo_data:/var/lib/postgresql/data
+    command: postgres -c max_connections=200
+    networks:
+      - app-network
+    ports:
+      - "${EVOLUTION_DB_HOST_PORT:-5433}:5432"
+
+  evolution-api:
+    image: atendai/evolution-api:v2.2.3
+    container_name: mcp_erp_evolution_api
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-change-me}
+      DATABASE_ENABLED: 'true'
+      DATABASE_PROVIDER: 'postgresql'
+      DATABASE_CONNECTION_URI: ${EVOLUTION_DB_CONNECTION_URI}
+      CACHE_REDIS_ENABLED: 'true'
+      CACHE_REDIS_URI: 'redis://redis:6379/1'
+      CACHE_REDIS_PREFIX_KEY: 'evolution_v2'
+      RABBITMQ_ENABLED: 'true'
+      RABBITMQ_URI: 'amqp://${RABBITMQ_DEFAULT_USER:-user}:${RABBITMQ_DEFAULT_PASS:-password}@rabbitmq:5672'
+      S3_ENABLED: 'false'
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minio_admin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio_password}
+      S3_BUCKET: 'evolution'
+      S3_ENDPOINT: 'http://minio:9000'
+      S3_PORT: 9000
+      S3_USE_SSL: 'false'
+      API_AUDIO_CONVERTER: 'http://audio-converter:4040/process-audio'
+    depends_on:
+      evolution_postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - app-network
+
+  audio-converter:
+    container_name: mcp_erp_audio_converter
+    image: atendai/evolution-audio-converter:latest
+    restart: always
+    ports:
+      - "4040:4040"
+    networks:
+      - app-network
+    environment:
+      PORT: 4040
+      API_KEY: ${AUDIO_CONVERTER_API_KEY:-changeme}
+      ENABLE_TRANSCRIPTION: 'true'
+      TRANSCRIPTION_PROVIDER: 'openai'
+      OPENAI_API_KEY: ${AUDIO_CONVERTER_OPENAI_API_KEY}
+      GROQ_API_KEY: ${AUDIO_CONVERTER_GROQ_API_KEY}
+      TRANSCRIPTION_LANGUAGE: 'pt'
+    expose:
+      - 4040
+
+  app:
+    container_name: mcp_erp_app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      OMIE_APP_KEY: ${OMIE_APP_KEY}
+      OMIE_APP_SECRET: ${OMIE_APP_SECRET}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      AGENT_PROVIDER: ${AGENT_PROVIDER}
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      EVOLUTION_INSTANCE_NAME: ${EVOLUTION_INSTANCE_NAME}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      EVOLUTION_DB_NAME: ${EVOLUTION_DB_NAME}
+      EVOLUTION_DB_USER: ${EVOLUTION_DB_USER}
+      EVOLUTION_DB_PASSWORD: ${EVOLUTION_DB_PASSWORD}
+      EVOLUTION_DB_HOST_PORT: ${EVOLUTION_DB_HOST_PORT}
+      EVOLUTION_DB_CONNECTION_URI: ${EVOLUTION_DB_CONNECTION_URI}
+      CACHE_REDIS_ENABLED: ${CACHE_REDIS_ENABLED}
+      CACHE_REDIS_URI: ${CACHE_REDIS_URI}
+      CACHE_REDIS_PREFIX_KEY: ${CACHE_REDIS_PREFIX_KEY}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_ENABLED: ${RABBITMQ_ENABLED}
+      RABBITMQ_URI: ${RABBITMQ_URI}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_ENABLED: ${S3_ENABLED}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_PORT: ${S3_PORT}
+      S3_USE_SSL: ${S3_USE_SSL}
+      AUDIO_CONVERTER_API_KEY: ${AUDIO_CONVERTER_API_KEY}
+      AUDIO_CONVERTER_OPENAI_API_KEY: ${AUDIO_CONVERTER_OPENAI_API_KEY}
+      AUDIO_CONVERTER_GROQ_API_KEY: ${AUDIO_CONVERTER_GROQ_API_KEY}
+      API_AUDIO_CONVERTER: ${API_AUDIO_CONVERTER}
+      ENABLE_TRANSCRIPTION: ${ENABLE_TRANSCRIPTION}
+      TRANSCRIPTION_PROVIDER: ${TRANSCRIPTION_PROVIDER}
+      TRANSCRIPTION_LANGUAGE: ${TRANSCRIPTION_LANGUAGE}
+    volumes:
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./tasks:/app/tasks
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+    depends_on:
+      db:
+        condition: service_started
+      evolution-api:
+        condition: service_started
+    networks:
+      - app-network
+
+volumes:
+  postgres_adk_data:
+  postgres_evo_data:
+  redis_data:
+  rabbitmq_data:
+  minio_data:
+  evolution_instances:
+
+networks:
+  app-network:
+    driver: bridge 
